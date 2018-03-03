@@ -1,4 +1,4 @@
-import { AfterViewInit, Directive, DoCheck, ElementRef, HostListener, Input, NgZone, OnDestroy, Renderer2 } from '@angular/core';
+import { Directive, Input, HostListener, Renderer, ElementRef, DoCheck, NgZone } from '@angular/core';
 import { TreeDraggedElement } from '../models/tree-dragged-element.model';
 
 const DRAG_OVER_CLASS = 'is-dragging-over';
@@ -6,29 +6,22 @@ const DRAG_OVER_CLASS = 'is-dragging-over';
 @Directive({
   selector: '[treeDrag]'
 })
-export class TreeDragDirective implements AfterViewInit, DoCheck, OnDestroy {
+export class TreeDragDirective implements DoCheck {
   @Input('treeDrag') draggedElement;
   @Input() treeDragEnabled;
-  private readonly dragEventHandler: (ev: DragEvent) => void;
 
-  constructor(private el: ElementRef, private renderer: Renderer2, private treeDraggedElement: TreeDraggedElement, private ngZone: NgZone) {
-    this.dragEventHandler = this.onDrag.bind(this);
+  constructor(private el: ElementRef, private renderer: Renderer, private treeDraggedElement: TreeDraggedElement, private zone: NgZone) {
   }
 
   ngAfterViewInit() {
-    let el: HTMLElement = this.el.nativeElement;
-    this.ngZone.runOutsideAngular(() => {
-      el.addEventListener('drag', this.dragEventHandler);
+    let el: HTMLElement = this.el.nativeElement!;
+    this.zone.runOutsideAngular(() => {
+      el.addEventListener('drag', this.onDrag.bind(this));
     });
   }
 
   ngDoCheck() {
-    this.renderer.setAttribute(this.el.nativeElement, 'draggable', this.treeDragEnabled ? 'true' : 'false');
-  }
-
-  ngOnDestroy() {
-    let el: HTMLElement = this.el.nativeElement;
-    el.removeEventListener('drag', this.dragEventHandler);
+    this.renderer.setElementAttribute(this.el.nativeElement, 'draggable', this.treeDragEnabled ? 'true' : 'false');
   }
 
   @HostListener('dragstart', ['$event']) onDragStart(ev) {
@@ -40,6 +33,11 @@ export class TreeDragDirective implements AfterViewInit, DoCheck, OnDestroy {
     }
   }
 
+  /**
+   * This event is run outside of angular.
+   * If the mouse action makes changes to application state,
+   * it should manually trigger change detection
+   */
   onDrag(ev) {
     if (this.draggedElement.mouseAction) {
       this.draggedElement.mouseAction('drag', ev);

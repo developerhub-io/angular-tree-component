@@ -1,15 +1,4 @@
-import {
-  AfterViewInit,
-  Directive,
-  ElementRef,
-  EventEmitter,
-  HostListener,
-  Input,
-  NgZone,
-  OnDestroy,
-  Output,
-  Renderer2
-} from '@angular/core';
+import { Directive, Output, Input, EventEmitter, HostListener, Renderer, ElementRef, NgZone } from '@angular/core';
 import { TreeDraggedElement } from '../models/tree-dragged-element.model';
 
 const DRAG_OVER_CLASS = 'is-dragging-over';
@@ -18,86 +7,71 @@ const DRAG_DISABLED_CLASS = 'is-dragging-over-disabled';
 @Directive({
   selector: '[treeDrop]'
 })
-export class TreeDropDirective implements AfterViewInit, OnDestroy {
-  @Input() allowDragoverStyling = true;
+export class TreeDropDirective {
   @Output('treeDrop') onDropCallback = new EventEmitter();
   @Output('treeDropDragOver') onDragOverCallback = new EventEmitter();
   @Output('treeDropDragLeave') onDragLeaveCallback = new EventEmitter();
   @Output('treeDropDragEnter') onDragEnterCallback = new EventEmitter();
-  private readonly dragOverEventHandler: (ev: DragEvent) => void;
-  private readonly dragEnterEventHandler: (ev: DragEvent) => void;
-  private readonly dragLeaveEventHandler: (ev: DragEvent) => void;
 
   private _allowDrop = (element, $event) => true;
-
   @Input() set treeAllowDrop(allowDrop) {
     if (allowDrop instanceof Function) {
       this._allowDrop = allowDrop;
     }
     else this._allowDrop = (element, $event) => allowDrop;
   }
-
   allowDrop($event) {
     return this._allowDrop(this.treeDraggedElement.get(), $event);
   }
 
-  constructor(private el: ElementRef, private renderer: Renderer2, private treeDraggedElement: TreeDraggedElement, private ngZone: NgZone) {
-    this.dragOverEventHandler = this.onDragOver.bind(this);
-    this.dragEnterEventHandler = this.onDragEnter.bind(this);
-    this.dragLeaveEventHandler = this.onDragLeave.bind(this);
+  constructor(private el: ElementRef, private renderer: Renderer, private treeDraggedElement: TreeDraggedElement, private zone: NgZone) {
   }
 
   ngAfterViewInit() {
-    let el: HTMLElement = this.el.nativeElement;
-    this.ngZone.runOutsideAngular(() => {
-      el.addEventListener('dragover', this.dragOverEventHandler);
-      el.addEventListener('dragenter', this.dragEnterEventHandler);
-      el.addEventListener('dragleave', this.dragLeaveEventHandler);
+    this.zone.runOutsideAngular(() => {
+      let el = <HTMLElement>this.el.nativeElement!;
+      el.addEventListener('dragover', this.onDragOver.bind(this));
+      el.addEventListener('dragenter', this.onDragEnter.bind(this));
+      el.addEventListener('dragleave', this.onDragLeave.bind(this));
     });
   }
 
-  ngOnDestroy() {
-    let el: HTMLElement = this.el.nativeElement;
-    el.removeEventListener('dragover', this.dragOverEventHandler);
-    el.removeEventListener('dragenter', this.dragEnterEventHandler);
-    el.removeEventListener('dragleave', this.dragLeaveEventHandler);
-  }
-
+  /**
+   * This event is run outside of angular.
+   * If the mouse action makes changes to application state,
+   * it should manually trigger change detection
+   */
   onDragOver($event) {
-    if (!this.allowDrop($event)) {
-      if (this.allowDragoverStyling) {
-        return this.addDisabledClass();
-      }
-      return;
-    }
+    if (!this.allowDrop($event)) return this.addDisabledClass();
 
     this.onDragOverCallback.emit({event: $event, element: this.treeDraggedElement.get()});
 
     $event.preventDefault();
-    if (this.allowDragoverStyling) {
-      this.addClass();
-    }
+    this.addClass();
   }
 
+  /**
+   * This event is run outside of angular.
+   * If the mouse action makes changes to application state,
+   * it should manually trigger change detection
+   */
   onDragEnter($event) {
     if (!this.allowDrop($event)) return;
 
-    $event.preventDefault();
     this.onDragEnterCallback.emit({event: $event, element: this.treeDraggedElement.get()});
   }
 
+  /**
+   * This event is run outside of angular.
+   * If the mouse action makes changes to application state,
+   * it should manually trigger change detection
+   */
   onDragLeave($event) {
-    if (!this.allowDrop($event)) {
-      if (this.allowDragoverStyling) {
-        return this.removeDisabledClass();
-      }
-      return;
-    }
+    if (!this.allowDrop($event)) return this.removeDisabledClass();
+
     this.onDragLeaveCallback.emit({event: $event, element: this.treeDraggedElement.get()});
 
-    if (this.allowDragoverStyling) {
-      this.removeClass();
-    }
+    this.removeClass();
   }
 
   @HostListener('drop', ['$event']) onDrop($event) {
@@ -105,26 +79,23 @@ export class TreeDropDirective implements AfterViewInit, OnDestroy {
 
     $event.preventDefault();
     this.onDropCallback.emit({event: $event, element: this.treeDraggedElement.get()});
-
-    if (this.allowDragoverStyling) {
-      this.removeClass();
-    }
+    this.removeClass();
     this.treeDraggedElement.set(null);
   }
 
   private addClass() {
-    this.renderer.addClass(this.el.nativeElement, DRAG_OVER_CLASS);
+    this.renderer.setElementClass(this.el.nativeElement, DRAG_OVER_CLASS, true);
   }
 
   private removeClass() {
-    this.renderer.removeClass(this.el.nativeElement, DRAG_OVER_CLASS);
+    this.renderer.setElementClass(this.el.nativeElement, DRAG_OVER_CLASS, false);
   }
 
   private addDisabledClass() {
-    this.renderer.addClass(this.el.nativeElement, DRAG_DISABLED_CLASS);
+    this.renderer.setElementClass(this.el.nativeElement, DRAG_DISABLED_CLASS, true);
   }
 
   private removeDisabledClass() {
-    this.renderer.removeClass(this.el.nativeElement, DRAG_DISABLED_CLASS);
+    this.renderer.setElementClass(this.el.nativeElement, DRAG_DISABLED_CLASS, false);
   }
 }
